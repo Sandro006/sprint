@@ -1,8 +1,7 @@
 @echo off
 
-set PROJECT=sprint-0-
-set TOMCAT=C:\Program Files\Apache Software Foundation\Tomcat 9.0
-
+set PROJECT=sprint-0
+set TOMCAT=C:\Program Files\xampp\tomcat
 echo ==========================
 echo Compilation...
 echo ==========================
@@ -46,7 +45,8 @@ echo DEPLOIEMENT TERMINE
 echo ==========================
 echo.
 echo Tester :
-echo http://localhost:8081/%PROJECT%/users
+echo http://localhost:8080/%PROJECT%/users
 echo.
 
 pause
+\
