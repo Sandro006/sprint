@@ -3,232 +3,115 @@ package framework;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-
+import java.net.URL;
+import java.util.*;
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.*;
+
+import framework.annotations.Controller;
+import framework.annotations.GetMapping;
 
 public class FrontController extends HttpServlet {
-
-    private HashMap<String, String> routes = new HashMap<>();
-
-    // Liste des contrôleurs trouvés au démarrage
+    private HashMap<String, String> routes = new HashMap<>(); // Stocke "url" -> "Classe:Methode"
     private List<Class<?>> controllers = new ArrayList<>();
 
-    /**
-     * Scan d'un package pour trouver les classes annotées @Controller
-     */
-    private List<Class<?>> scanControllers(String packageName) {
-        List<Class<?>> result = new ArrayList<>();
-
-        String basePath = packageName.replace('.', '/');
-
-        try {
-            ClassLoader classLoader =
-                    Thread.currentThread().getContextClassLoader();
-
-            java.util.Enumeration<java.net.URL> resources =
-                    classLoader.getResources(basePath);
-
-            while (resources.hasMoreElements()) {
-                java.net.URL url = resources.nextElement();
-
-                if (!"file".equals(url.getProtocol())) {
-                    continue;
-                }
-
-                File dir = new File(url.toURI());
-
-                if (!dir.exists() || !dir.isDirectory()) {
-                    continue;
-                }
-
-                scanDir(packageName, dir, result);
-            }
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        return result;
-    }
-
-    private void scanDir(
-            String packageName,
-            File dir,
-            List<Class<?>> acc) {
-
-        File[] files = dir.listFiles();
-
-        if (files == null) {
-            return;
-        }
-
-        for (File f : files) {
-
-            if (f.isDirectory()) {
-
-                scanDir(
-                        packageName + "." + f.getName(),
-                        f,
-                        acc);
-
-            } else if (f.getName().endsWith(".class")) {
-
-                String className =
-                        packageName + "."
-                                + f.getName().substring(
-                                        0,
-                                        f.getName().length() - 6);
-
-                try {
-
-                    Class<?> clazz =
-                            Class.forName(className);
-
-                    if (clazz.isAnnotationPresent(
-                            Controller.class)) {
-
-                        acc.add(clazz);
-                    }
-
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
-
-    /**
-     * Appelé une seule fois au démarrage de l'application
-     */
     @Override
     public void init() {
+        try {
+            // 1. On récupère le dossier "controller" dans les ressources compilées
+            URL resource = Thread.currentThread().getContextClassLoader().getResource("controller");
+            if (resource == null) return;
 
-        controllers = scanControllers("controller");
+            File folder = new File(resource.toURI());
 
-        System.out.println(
-                "[FrontController] Contrôleurs trouvés :");
+            // 2. On parcourt tous les fichiers du dossier
+            for (File file : folder.listFiles()) {
+                if (!file.getName().endsWith(".class")) continue;
 
-        for (Class<?> c : controllers) {
-            System.out.println(
-                    " - " + c.getName());
+                // On enlève le ".class" pour avoir juste le nom de la classe
+                String className = file.getName().replace(".class", "");
+                Class<?> clazz = Class.forName("controller." + className);
+
+                // 3. Si la classe a l'annotation @Controller, on la garde
+                if (!clazz.isAnnotationPresent(Controller.class)) continue;
+
+                controllers.add(clazz);
+
+                // 4. Construire les routes à partir de @GetMapping (méthodes)
+                for (Method m : clazz.getDeclaredMethods()) {
+                    if (m.isAnnotationPresent(GetMapping.class)) {
+                        GetMapping gm = m.getAnnotation(GetMapping.class);
+                        String url = gm.value();
+                        routes.put(url, clazz.getName() + ":" + m.getName());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
     @Override
-    protected void doGet(
-            HttpServletRequest request,
-            HttpServletResponse response)
-            throws ServletException, IOException {
+    protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
+        res.setContentType("text/html;charset=UTF-8");
+        var out = res.getWriter();
 
-        response.setContentType("text/html;charset=UTF-8");
+        // 1. Extraction de l'URL demandée (ex: /mon-app/home -> /home)
+        String url = req.getRequestURI().substring(req.getContextPath().length());
 
-        try {
+        // 2. Affichage HTML des contrôleurs et de leurs méthodes annotées @GetMapping
+        out.println("<h2>Contrôleurs trouvés :</h2>");
+        for (Class<?> c : controllers) {
+            out.println("<h3>" + c.getSimpleName() + "</h3><ul>");
 
-            response.getWriter().println(
-                    "<html><body>");
-
-            response.getWriter().println(
-                    "<h2>Contrôleurs trouvés</h2>");
-
-            if (controllers.isEmpty()) {
-                response.getWriter().println(
-                        "<p>Aucun contrôleur trouvé.</p>");
-            } else {
-                for (Class<?> c : controllers) {
-                    response.getWriter().println(
-                            "<h3>" + c.getSimpleName() + "</h3>");
-                    response.getWriter().println("<ul>");
-
-                    Method[] methods = c.getDeclaredMethods();
-                    boolean found = false;
-
-                    for (Method m : methods) {
-                        // Sprint 1: pas encore d’annotation @Url, donc on liste toutes les méthodes publiques
-                        // futures étapes: utilisation d'une annotation @Url sur chaque méthode.
-                        if (m.getParameterCount() == 0 && m.getReturnType() == String.class) {
-                            found = true;
-                            response.getWriter().println(
-                                    "<li> @Url -> méthode: " + m.getName() + "()</li>");
-                        }
-                    }
-
-                    if (!found) {
-                        response.getWriter().println(
-                                "<li>Aucune méthode candidate (String sans param)</li>");
-                    }
-
-                    response.getWriter().println("</ul>");
+            boolean any = false;
+            for (Method m : c.getDeclaredMethods()) {
+                if (m.isAnnotationPresent(GetMapping.class)) {
+                    any = true;
+                    String mapping = m.getAnnotation(GetMapping.class).value();
+                    out.println("<li>@GetMapping(\"" + mapping + "\") -> " + m.getName() + "()</li>");
                 }
             }
 
+            if (!any) {
+                out.println("<li>Aucune méthode annotée avec @GetMapping</li>");
+            }
+            out.println("</ul>");
+        }
 
-            String uri = request.getRequestURI();
-            String context = request.getContextPath();
-            String url = uri.substring(context.length());
+        // 3. Routage et exécution (ou affichage de toutes les routes si l'URL n'existe pas)
+        out.println("<p><b>URL demandée :</b> " + url + "</p>");
 
-            response.getWriter().println(
-                    "<p><b>URI :</b> " + uri + "</p>");
+        String mapping = routes.get(url);
+        if (mapping != null) {
+            try {
+                String[] infos = mapping.split(":"); // "controller.MonController" et "maMethode"
+                Class<?> clazz = Class.forName(infos[0]);
+                Object ctrlInstance = clazz.getDeclaredConstructor().newInstance();
+                Method method = clazz.getMethod(infos[1]);
 
-            response.getWriter().println(
-                    "<p><b>Contexte :</b> "
-                            + context + "</p>");
+                Object result = method.invoke(ctrlInstance);
+                out.println("<h3>Résultat :</h3>" + result);
+            } catch (Exception e) {
+                out.println("<p style='color:red'>Erreur : " + e.getMessage() + "</p>");
+            }
+        } else {
+            out.println("<p style='color:orange'><b>Aucune route trouvée</b> pour " + url + "</p>");
+            out.println("<h3>Routes existantes :</h3><ul>");
 
-            response.getWriter().println(
-                    "<p><b>URL demandée :</b> "
-                            + url + "</p>");
+            List<String> urls = new ArrayList<>(routes.keySet());
+            Collections.sort(urls);
 
-            String mapping = routes.get(url);
-
-            if (mapping != null) {
-
-                String[] infos = mapping.split(":");
-
-                String className = infos[0];
+            for (String u : urls) {
+                String mp = routes.get(u);
+                String[] infos = mp.split(":");
+                String controllerClass = infos[0];
                 String methodName = infos[1];
-
-                Class<?> clazz =
-                        Class.forName(className);
-
-                Object controller =
-                        clazz.getDeclaredConstructor()
-                                .newInstance();
-
-                Method method =
-                        clazz.getMethod(methodName);
-
-                Object result =
-                        method.invoke(controller);
-
-                response.getWriter().println(
-                        "<h3>Résultat :</h3>");
-
-                response.getWriter().println(
-                        result);
-
-            } else {
-
-                response.getWriter().println(
-                        "<p>Aucune route trouvée pour "
-                                + url + "</p>");
+                out.println("<li>" + u + " -> " + controllerClass + "#" + methodName + "</li>");
             }
 
-            response.getWriter().println(
-                    "</body></html>");
-
-        } catch (Exception e) {
-
-            e.printStackTrace();
-
-            response.getWriter().println(
-                    "<p style='color:red'>Erreur : "
-                            + e.getMessage()
-                            + "</p>");
+            out.println("</ul>");
         }
     }
 }
+
