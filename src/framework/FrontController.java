@@ -8,48 +8,25 @@ import java.util.*;
 import javax.servlet.ServletException;
 import javax.servlet.http.*;
 
-import framework.annotations.Controller;
 import framework.annotations.GetMapping;
 
 public class FrontController extends HttpServlet {
-    private HashMap<String, String> routes = new HashMap<>(); // Stocke "url" -> "Classe:Methode"
-    private List<Class<?>> controllers = new ArrayList<>();
+    private final HashMap<String, String> routes = new HashMap<>(); // Stocke "url" -> "Classe:Methode"
+    private final List<Class<?>> controllers = new ArrayList<>();
 
+    
     @Override
     public void init() {
         try {
-            // 1. On récupère le dossier "controller" dans les ressources compilées
-            URL resource = Thread.currentThread().getContextClassLoader().getResource("controller");
-            if (resource == null) return;
+            File folder = FrontControllerScanner.resolveControllerFolder();
+            if (folder == null) return;
 
-            File folder = new File(resource.toURI());
-
-            // 2. On parcourt tous les fichiers du dossier
-            for (File file : folder.listFiles()) {
-                if (!file.getName().endsWith(".class")) continue;
-
-                // On enlève le ".class" pour avoir juste le nom de la classe
-                String className = file.getName().replace(".class", "");
-                Class<?> clazz = Class.forName("controller." + className);
-
-                // 3. Si la classe a l'annotation @Controller, on la garde
-                if (!clazz.isAnnotationPresent(Controller.class)) continue;
-
-                controllers.add(clazz);
-
-                // 4. Construire les routes à partir de @GetMapping (méthodes)
-                for (Method m : clazz.getDeclaredMethods()) {
-                    if (m.isAnnotationPresent(GetMapping.class)) {
-                        GetMapping gm = m.getAnnotation(GetMapping.class);
-                        String url = gm.value();
-                        routes.put(url, clazz.getName() + ":" + m.getName());
-                    }
-                }
-            }
+            FrontControllerScanner.scanControllersAndBuildRoutes(folder, routes, controllers);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
+
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
