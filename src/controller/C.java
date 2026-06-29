@@ -1,9 +1,11 @@
 package controller;
-import framework.Controller;
+import framework.annotations.Controller;
+import framework.annotations.GetMapping;
 
 @Controller
 public class C {
+    @GetMapping("/c/test")
     public String goodString() {
-        return "Hello from C.m()";
+        return "Hello from C COntrller";
     }
 }
