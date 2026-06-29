@@ -3,16 +3,25 @@ package framework;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
-import java.net.URL;
+
 import java.util.*;
 import javax.servlet.ServletException;
 import javax.servlet.http.*;
-
 import framework.annotations.GetMapping;
+
+
 
 public class FrontController extends HttpServlet {
     private final HashMap<String, String> routes = new HashMap<>(); // Stocke "url" -> "Classe:Methode"
     private final List<Class<?>> controllers = new ArrayList<>();
+
+    private static final boolean CONSOLE_DEBUG = true;
+
+    private static void fwLog(String msg) {
+        if (!CONSOLE_DEBUG) return;
+        System.out.println("[framework] " + msg);
+    }
+
 
     
     @Override
@@ -35,6 +44,8 @@ public class FrontController extends HttpServlet {
 
         // 1. Extraction de l'URL demandée (ex: /mon-app/home -> /home)
         String url = req.getRequestURI().substring(req.getContextPath().length());
+        fwLog("doGet url=" + url);
+
 
         // 2. Affichage HTML des contrôleurs et de leurs méthodes annotées @GetMapping
         out.println("<h2>Contrôleurs trouvés :</h2>");
