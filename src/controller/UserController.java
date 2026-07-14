@@ -9,7 +9,7 @@ public class UserController {
     public String list() {
         return "Bonjour depuis UserController";
     }
-
+    
     public String getUserById(int id) {
         return "Utilisateur avec l'ID : " + id;
     }

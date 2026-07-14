@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Context>
+    <!-- Valeurs attendues par le FrontController -->
+    <Parameter name="viewPrefix" value="/views/" override="false" />
+    <Parameter name="viewSuffix" value=".jsp" override="false" />
+</Context>
+
+
