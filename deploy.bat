@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set PROJECT=sprint-2
+set PROJECT=sprint
 set TOMCAT=C:\Program Files\xampp\tomcat\
 
 :: Vérification que Tomcat existe

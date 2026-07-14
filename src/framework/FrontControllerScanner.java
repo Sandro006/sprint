@@ -7,7 +7,9 @@ import java.util.HashMap;
 import java.util.List;
 
 import framework.annotations.Controller;
+
 import framework.annotations.GetMapping;
+import framework.annotations.PostMapping;
 
 /**
  * Sépare la logique de scan/reflexion du FrontController.
@@ -58,15 +60,39 @@ public final class FrontControllerScanner {
 
     private static void buildRoutesForController(Class<?> clazz, HashMap<String, String> routes) {
         for (Method m : clazz.getDeclaredMethods()) {
-            if (!m.isAnnotationPresent(GetMapping.class)) continue;
+            // GET
+            if (m.isAnnotationPresent(GetMapping.class)) {
+                GetMapping gm = m.getAnnotation(GetMapping.class);
+                String url = gm.value();
+                String key = "GET:" + url;
+                String mapping = clazz.getName() + ":" + m.getName();
 
-            GetMapping gm = m.getAnnotation(GetMapping.class);
-            String url = gm.value();
-            String mapping = clazz.getName() + ":" + m.getName();
-            routes.put(url, mapping);
-            log("route mapped: GET " + url + " -> " + mapping);
+                String previous = routes.put(key, mapping);
+                if (previous != null && !previous.equals(mapping)) {
+                    System.err.println("[framework] DUPLICATE route detected for " + key + " : " + previous + "  <->  " + mapping);
+                }
+
+                log("route mapped: GET " + url + " -> " + mapping);
+            }
+
+            // POST
+            if (m.isAnnotationPresent(PostMapping.class)) {
+                PostMapping pm = m.getAnnotation(PostMapping.class);
+                String url = pm.value();
+                String key = "POST:" + url;
+                String mapping = clazz.getName() + ":" + m.getName();
+
+                String previous = routes.put(key, mapping);
+                if (previous != null && !previous.equals(mapping)) {
+                    System.err.println("[framework] DUPLICATE route detected for " + key + " : " + previous + "  <->  " + mapping);
+                }
+
+                log("route mapped: POST " + url + " -> " + mapping);
+            }
+
         }
     }
+
 
 }
 
