@@ -15,6 +15,10 @@ public class FrontController extends HttpServlet {
     private final List<Class<?>> controllers = new ArrayList<>();
     private final HashMap<Class<?>, Object> controllerInstances = new HashMap<>();
 
+    private String viewPrefix = "/views/";
+    private String viewSuffix = ".jsp";
+
+
 
     private static final boolean CONSOLE_DEBUG = true;
 
@@ -94,7 +98,34 @@ public class FrontController extends HttpServlet {
                 Method method = clazz.getMethod(infos[1]);
 
                 Object result = method.invoke(ctrlInstance);
+
+                if (result instanceof framework.ModelAndView) {
+                    framework.ModelAndView mv = (framework.ModelAndView) result;
+
+                    // Prefix / suffix depuis context.xml (ou valeurs par défaut)
+                    String prefix = viewPrefix;
+                    String suffix = viewSuffix;
+                    try {
+                        javax.servlet.ServletContext sc = getServletContext();
+                        String p = sc.getInitParameter("viewPrefix");
+                        String s = sc.getInitParameter("viewSuffix");
+                        if (p != null) prefix = p;
+                        if (s != null) suffix = s;
+                    } catch (Exception ignore) {
+                        // garder valeurs par défaut
+                    }
+
+                    String viewPath = prefix + mv.getViewName() + suffix;
+                    for (java.util.Map.Entry<String, Object> entry : mv.getModel().entrySet()) {
+                        req.setAttribute(entry.getKey(), entry.getValue());
+                    }
+                    req.getRequestDispatcher(viewPath).forward(req, res);
+                    return;
+                }
+
                 out.println("<h3>Résultat :</h3>" + result);
+
+
             } catch (Exception e) {
                 out.println("<p style='color:red'>Erreur : " + e.getMessage() + "</p>");
             }

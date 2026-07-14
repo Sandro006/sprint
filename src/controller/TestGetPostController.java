@@ -17,6 +17,13 @@ public class TestGetPostController {
         return "OK: POST /test/get";
     }
 
+    @GetMapping("/test/mv")
+    public framework.ModelAndView mvTest() {
+        return new framework.ModelAndView("test")
+                .addObject("msg", "OK: ModelAndView /test/mv");
+    }
+
+
     @GetMapping("/test/get")
     public String onlyGet() {
         return "OK: GET /test/only-get";
