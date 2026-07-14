@@ -1,4 +1,4 @@
-### -Création de l'arborescence du projet
+##### -Création de l'arborescence du projet
 
 src/
 controller /
@@ -25,8 +25,15 @@ views /
 ## Sprint 3
 
 ### 3.1
-  - Map(url,Class)
-    - @GetMapping("/test","GET")
-  -  faire une classe pour savoir si l'url est get ou post (dans le cas où 2 methodes avec le meme url?)
+
+- Map(url,Class)
+  - @GetMapping("/test","GET")
+- faire une classe pour savoir si l'url est get ou post (dans le cas où 2 methodes avec le meme url?)
+
 ### 3.2
-  - Exécuter le methode (à tjr instancier)
+
+- Exécuter le methode (à tjr instancier)
+
+## Sprint 4
+
+- 
