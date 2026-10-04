@@ -1,49 +1,49 @@
-# main
- Framework
-I) sprint0:
-   -> ajouter le .jar du framework dans le sous-repertoire lib de votre projet
+# Gogo Framework — Mini MVC Java
 
-II) sprint1:
-   -> ajouter le .jar du framework dans le sous-repertoire lib de votre projet
-   -> mettez vos controllers dans un sous-repertoire "Controller" puis annoter "@AnnotationController"
+Petit framework MVC Java (type Spring simplifié) basé sur un `FrontController` Servlet `jakarta.*`.
 
-III) sprint2:
-   -> ajouter le .jar du framework dans le sous-repertoire lib de votre projet
-   -> annoter vos methodes par "@AnnotationMethode"
+Il scanne les classes annotées `@Controller`, mappe les URLs vers les méthodes via `@Url`, gère les verbes `@Get` / `@Post`, le binding des paramètres, la validation, les vues et les API JSON.
 
-IV) sprint3:
-   -> ajouter le .jar du framework dans le sous-repertoire lib de votre projet
-   -> mettez vos controllers dans un sous-repertoire "Controller" puis annoter "@Controller"
-   -> annoter vos methodes par "@Get"
-   -> Retourner votre fonction en String
+## Fonctionnalités
+- Routing : `@Controller` + `@Url("/liste")`
+- Verbes HTTP : `@Get`, `@Post`
+- Paramètres : `@Param`
+- Vues : `ModelView` / `ModelAndView` (`setUrl()` + `addObjet()`)
+- API REST : `@RestApi` (JSON maison via `util.JsonUtil`)
 
-V) sprint4:
-   -> ajouter le .jar du framework dans le sous-repertoire lib de votre projet
-   -> mettez vos controllers dans un sous-repertoire "Controller" puis annoter "@Controller"
-   -> annoter vos methodes par "@Get"
-   -> Retourner votre fonction en String et en ModelView
+## Prérequis
+- JDK (avec `javac`, `jar` dans le PATH)
+- Apache Tomcat 10.1 (framework en `jakarta.servlet`, incompatible Tomcat 9)
+- Aucune dépendance externe (JSON maison intégré)
 
-VI) sprint5:
-   -> ajouter le .jar du framework dans le sous-repertoire lib de votre projet
-   -> mettez vos controllers dans un sous-repertoire "Controller" puis annoter "@Controller"
-   -> annoter vos methodes par "@Get"
-   -> Retourner votre fonction en String et ne ModelView (pas d'autres)
-   -> Il ne doit pas y avoir des methodes de meme url
-   -> Les controllers doivent etre dans le package "Controller"
-   -> Le package "Controller" ne doit pas etre vide
-   
-VII) sprint6:
-   -> les autres fonctionnalites restent inchanger
-   -> On peut gerer maitenant un formulaire en creant une annotation @RequestParam(nom_champ_du_formulaire) ou bien le nom du parametre
+## Build
+```bat
+script-framework.bat
+```
+1. Compile `src/*.java`
+2. Crée `gogo.jar`
+3. Le synchronise vers `FrontController-Test` (`lib/` + `WEB-INF/lib/`)
+4. Ensuite lance `deploy.bat` dans `FrontController-Test`
 
-VIII) sprint7:
-   -> Mais si les champs du formulaire sont beaucoup, il n'est pas pratique de les recuperé un a un dans le controller avec l'annotation @RequestParam
-   -> Dans ce cas, on a cree une annotation @ObjectParam(nomChamps[0]); dans le coté developpeur, les noms des champs doivent etre de type comme le suivant se le developpeur utilise une annotation @ObjectParam pour recuperer les champs du formulaire: <input type="text" name="nomClasse.nomAttribut">
-   -> On a aussi geré une exception que si l'un des parametres des fonctions pour gerer le formulaire n'est pas annoté @RequestParam ou @ObjectParam..on leve une exception.(Aléa)
+## Exemple rapide
+```java
+@Controller
+public class MonController {
 
-VIV) sprint8:
-   -> les autres fonctionnalites restent inchanger
-   -> On va gerer une session en facilitant le plus possible le travail du developpeur
-   -> On cree une classe CustomerSession avec attribut HashMap et methodes(add, get, update, delete) 
+    @Url(url = "/hello")
+    @Get
+    public ModelAndView hello(@Param("nom") String nom) {
+        ModelAndView mv = new ModelAndView();
+        mv.setUrl("/hello.jsp");
+        mv.addObjet("nom", nom);
+        return mv;
+    }
 
-
+    @Url(url = "/api/hello")
+    @Get
+    @RestApi
+    public String helloJson(@Param("nom") String nom) {
+        return "{\"message\":\"Bonjour \"}";
+    }
+}
+```

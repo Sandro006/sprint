@@ -15,13 +15,12 @@ import scan.ControllerScan;
 import scan.MethodScan;
 import scan.SessionScan;
 import util.CustomSession;
+import util.JsonUtil;
 import util.Mapping;
 import util.ModelAndView;
 import annotation.RestApi;
 import java.util.List;
 import java.util.Map;
-
-import com.google.gson.Gson;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,7 +32,6 @@ public class FrontController extends HttpServlet {
     private Map<String, Mapping> urlMappings = new HashMap<>();
     private Map<String, String> handleError = new HashMap<>();
     private boolean initialized = false;
-    private Gson gson = new Gson();
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
@@ -180,7 +178,7 @@ public class FrontController extends HttpServlet {
                                 response.setContentType("application/json;charset=UTF-8");
                                 sb.setLength(0);
 
-                                out.println(gson.toJson(modelAndView.getData()));
+                                out.println(JsonUtil.toJson(modelAndView.getData()));
 
                                 return;
                             }
@@ -192,7 +190,11 @@ public class FrontController extends HttpServlet {
                         } else {
                             if (method.isAnnotationPresent(RestApi.class)) {
                                 response.setContentType("application/json;charset=UTF-8");
-                                sb.append(result);
+                                if (result instanceof String) {
+                                    sb.append(result);
+                                } else {
+                                    sb.append(JsonUtil.toJson(result));
+                                }
                             }
                         }
                     } catch (InvocationTargetException e) {

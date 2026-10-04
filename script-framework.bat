@@ -110,7 +110,7 @@ echo.
 echo [3/4] Synchronisation vers le projet de test...
 
 copy /y "%OUTPUT_JAR%" "%WEB_LIB_DIR%\gogo.jar" > nul
-if exist "%LIB_DIR%\gson-*.jar" copy /y "%LIB_DIR%\gson-*.jar" "%WEB_LIB_DIR%\" > nul
+REM Plus de dependance Gson : JSON gere par util.JsonUtil maison
 
 REM ==========================================
 REM VERIFICATION
