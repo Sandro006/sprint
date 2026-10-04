@@ -1,10 +1,9 @@
 {
-    "java.configuration.runtimes": [
-        {
-            "name": "JavaSE-1.8",
-            "path": "C:\\Program Files\\Java\\jdk-21",
-            "default": true
-        }
+    "java.project.referencedLibraries": [
+        "c:\\Users\\ME-PC\\Documents\\GitHub\\lib\\servlet-api.jar",
+        "c:\\Users\\ME-PC\\Documents\\GitHub\\lib\\gson-2.10.jar"
     ],
-    "java.jdt.ls.java.home": "C:\\Program Files\\Java\\jdk-21"
+    "java.project.sourcePaths": [
+        "src"
+    ]
 }
