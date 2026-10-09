@@ -9,6 +9,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
@@ -90,45 +91,91 @@ public class MethodScan {
                     paramValues[i] = convertParameterType(paramValue, parameters[i].getType());
                 }
             } else if (objectParam != null) {
-                paramValues[i] = handleObjectParam(parameters[i].getType(), objectParam);
+                paramValues[i] = handleObjectParam(parameters[i].getType(), objectParam.name());
             } else if (parameters[i].getType() == CustomSession.class) {
                 paramValues[i] = handleCustomSession();
+            } else if (isPojo(parameters[i].getType())) {
+                // Auto-bind type Spring @ModelAttribute : sans annotation,
+                // mappe ?nom=...&age=... directement sur les fields.
+                paramValues[i] = handleObjectParam(parameters[i].getType(), "");
             } else {
                 throw new Exception("<b>ETU004168</b>  les parametres doivent etre annoter par @Param ou @ParamObject");
             }
         }
         return paramValues;
     }
+
+    private boolean isPojo(Class<?> type) {
+        if (type.isPrimitive() || type.isEnum() || type.isArray()) {
+            return false;
+        }
+        if (type == String.class || type == CustomSession.class || type == CustomPart.class) {
+            return false;
+        }
+        String name = type.getName();
+        if (name.startsWith("java.") || name.startsWith("jakarta.")) {
+            return false;
+        }
+        if (Collection.class.isAssignableFrom(type) || Map.class.isAssignableFrom(type)) {
+            return false;
+        }
+        if (Number.class.isAssignableFrom(type) || type == Boolean.class || type == Character.class) {
+            return false;
+        }
+        try {
+            type.getDeclaredConstructor();
+            return true;
+        } catch (NoSuchMethodException e) {
+            return false;
+        }
+    }
     
-    private Object handleObjectParam(Class<?> paramType, ParamObject objectParam) throws Exception {
+    private Object handleObjectParam(Class<?> paramType, String objectName) throws Exception {
         Object paramObject = paramType.getDeclaredConstructor().newInstance();
-        Map<String, String[]> parameterMap = request.getParameterMap();
+        String prefix = objectName == null ? "" : objectName.trim();
+        boolean hasPrefix = !prefix.isEmpty();
 
-        for (Map.Entry<String, String[]> entry : parameterMap.entrySet()) {
-            String fullParamName = entry.getKey();
-            String[] paramNameParts = fullParamName.split("\\.");
-            if (paramNameParts.length < 2) continue;
+        for (Field field : paramType.getDeclaredFields()) {
+            if (java.lang.reflect.Modifier.isStatic(field.getModifiers())
+                    || java.lang.reflect.Modifier.isTransient(field.getModifiers())) {
+                continue;
+            }
 
-            String objectName = paramNameParts[0];
-            String fieldName = paramNameParts[1];
+            // Support @Role historique (set session)
+            if (field.isAnnotationPresent(annotation.Role.class)) {
+                validateRole(paramObject, field);
+                continue;
+            }
 
-            if (objectName.equalsIgnoreCase(objectParam.name())) {
-                Field[] fields = paramType.getDeclaredFields();
-                for (Field field : fields) {
-                    String fieldValue = request.getParameter(fullParamName);
-                    if (field.isAnnotationPresent(FieldAnnotation.class) && field.getAnnotation(FieldAnnotation.class).name().equalsIgnoreCase(fieldName)) {
-                        validateField(field, objectName, fieldName, fieldValue);
-                    }
+            String fieldName = field.getName();
+            String alias = null;
+            if (field.isAnnotationPresent(FieldAnnotation.class)) {
+                alias = field.getAnnotation(FieldAnnotation.class).name();
+            }
 
-                    if (field.getName().equalsIgnoreCase(fieldName)) {
-                        validateField(field, objectName, fieldName, fieldValue);
-                        field.setAccessible(true);
-                        field.set(paramObject, convertParameterType(fieldValue, field.getType()));
-                    }
-                    else{
-                        validateRole(paramObject, field);
-                    }
+            // 1) Priorité au format préfixé : etudiant.nom (compat ancien code)
+            // 2) Fallback flat : nom (ce que tu veux pour /bind-simple)
+            String value = null;
+            if (hasPrefix) {
+                value = request.getParameter(prefix + "." + fieldName);
+                if (value == null && alias != null && !alias.isBlank()) {
+                    value = request.getParameter(prefix + "." + alias);
                 }
+            }
+            if (value == null) {
+                value = request.getParameter(fieldName);
+            }
+            if (value == null && alias != null && !alias.isBlank()) {
+                value = request.getParameter(alias);
+            }
+
+            String errorObject = hasPrefix ? prefix : "";
+            // Valide même si absent (pour @Required)
+            validateField(field, errorObject, fieldName, value);
+
+            if (value != null) {
+                field.setAccessible(true);
+                field.set(paramObject, convertParameterType(value, field.getType()));
             }
         }
 
@@ -149,6 +196,11 @@ public class MethodScan {
     private void validateField(Field field, String objectName, String fieldName, String value) throws Exception {
         if (field.isAnnotationPresent(Required.class) && (value == null || value.isEmpty())) {
             addError(objectName, fieldName, field.getAnnotation(Required.class).message(), value);
+        }
+
+        // Si absent/vide : pas de contrôle Numeric/Date/Range (Required a déjà parlé)
+        if (value == null || value.isEmpty()) {
+            return;
         }
 
         if (field.isAnnotationPresent(Numeric.class)) {
@@ -173,8 +225,9 @@ public class MethodScan {
             try {
                 double numericValue = Double.parseDouble(value);
                 if (numericValue < range.min() || numericValue > range.max()) {
-                    handleError.put(objectName + "." + fieldName, value);
-                    handleError.put(objectName + "." + fieldName + ".err", field.getAnnotation(annotation.Range.class).message());
+                    String key = buildErrorKey(objectName, fieldName);
+                    handleError.put(key, value);
+                    handleError.put(key + ".err", field.getAnnotation(annotation.Range.class).message());
                 }
             } catch (NumberFormatException e) {
                 addError(objectName, fieldName, field.getAnnotation(Range.class).message(), value);
@@ -210,7 +263,7 @@ public class MethodScan {
     }
 
     private void addError(String objectName, String fieldName, String message, String value) {
-        String key = objectName + "." + fieldName;
+        String key = buildErrorKey(objectName, fieldName);
         String errorKey = key + ".err";
 
 
@@ -231,9 +284,20 @@ public class MethodScan {
         }
     }
 
+    private String buildErrorKey(String objectName, String fieldName) {
+        if (objectName == null || objectName.isBlank()) {
+            return fieldName;
+        }
+        return objectName + "." + fieldName;
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
     private Object convertParameterType(String paramValue, Class<?> paramType) throws Exception {
-        if (paramValue == null) {
+        if (paramValue == null || paramValue.isEmpty()) {
+            if (paramType == int.class) return 0;
+            if (paramType == long.class) return 0L;
+            if (paramType == double.class) return 0d;
+            if (paramType == boolean.class) return false;
             return null;
         }
 
