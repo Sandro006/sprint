@@ -42,6 +42,11 @@ public class FrontController extends HttpServlet {
                     ControllerScan controllerScan = new ControllerScan(urlMappings, controllerList, getServletContext(),
                             request);
                     controllerScan.initControllers();
+                    try {
+                        util.DBUtil.init(getServletContext());
+                    } catch (Exception dbEx) {
+                        System.out.println("[gogo] DB non configurée : " + dbEx.getMessage());
+                    }
                     initialized = true;
                 } catch (Exception e) {
                     try (PrintWriter out = response.getWriter()) {
