@@ -10,6 +10,7 @@ Il scanne les classes annotées `@Controller`, mappe les URLs vers les méthodes
 - Paramètres : `@Param`
 - Vues : `ModelView` / `ModelAndView` (`setUrl()` + `addObjet()`)
 - API REST : `@RestApi` (JSON maison via `util.JsonUtil`)
+- Base générique : `util.DBUtil` + `dao.BaseDAO` (JDBC, `@Table`/`@Column`/`@Id`)
 
 ## Prérequis
 - JDK (avec `javac`, `jar` dans le PATH)
@@ -45,5 +46,28 @@ public class MonController {
     public String helloJson(@Param("nom") String nom) {
         return "{\"message\":\"Bonjour \"}";
     }
+}
+```
+
+## Base de données (générique, testé MySQL)
+`web.xml` :
+```xml
+<context-param><param-name>db.driver</param-name><param-value>com.mysql.cj.jdbc.Driver</param-value></context-param>
+<context-param><param-name>db.url</param-name><param-value>jdbc:mysql://localhost:3306/test?useSSL=false&amp;serverTimezone=UTC</param-value></context-param>
+<context-param><param-name>db.user</param-name><param-value>root</param-value></context-param>
+<context-param><param-name>db.password</param-name><param-value></param-value></context-param>
+```
+Mettre `mysql-connector-j.jar` dans `WEB-INF/lib` (runtime seul, framework = `java.sql` seul).
+```java
+@Table(name="etudiant")
+public class Etudiant {
+  @Id private int id;
+  @Column(name="nom") private String nom;
+  // ctor vide + getters/setters
+}
+
+try (Connection c = DBUtil.getConnection(getServletContext())) {
+  BaseDAO<Etudiant> dao = new BaseDAO<>(Etudiant.class);
+  List<Etudiant> all = dao.findAll(c);
 }
 ```
