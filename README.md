@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 # Gogo Framework — Mini MVC Java
 
 Petit framework MVC Java (type Spring simplifié) basé sur un `FrontController` Servlet `jakarta.*`.
@@ -71,3 +72,6 @@ try (Connection c = DBUtil.getConnection(getServletContext())) {
   List<Etudiant> all = dao.findAll(c);
 }
 ```
+=======
+    # sprint-0-
+>>>>>>> Stashed changes
