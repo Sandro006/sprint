@@ -54,7 +54,7 @@ public class MethodScan {
                                                     .anyMatch(userRoles::contains);
 
                         if (!isAuthorized) {
-                            throw new Exception("Accès interdit : rôle insuffisant pour accéder à cette méthode.");
+                            throw new Exception("Accès interdit : rôle insuffisant pour accéder à cette méthode. alors changer le role dans la session avec @Role");
                         }
                     }
                     return;  
@@ -194,6 +194,10 @@ public class MethodScan {
     }
 
     private void validateField(Field field, String objectName, String fieldName, String value) throws Exception {
+
+
+
+        
         if (field.isAnnotationPresent(Required.class) && (value == null || value.isEmpty())) {
             addError(objectName, fieldName, field.getAnnotation(Required.class).message(), value);
         }
