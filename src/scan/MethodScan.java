@@ -185,6 +185,7 @@ public class MethodScan {
     private CustomSession handleCustomSession() {
         HttpSession session = request.getSession();
         CustomSession customSession = new CustomSession();
+        customSession.add("sessionId", session.getId());
         Enumeration<String> attributeNames = session.getAttributeNames();
         while (attributeNames.hasMoreElements()) {
             String attributeName = attributeNames.nextElement();
@@ -239,31 +240,59 @@ public class MethodScan {
         }
     }
 
-    public void validateRole(Object object,Field field) throws Exception{
-        if (field.isAnnotationPresent(annotation.Role.class)) {
-            annotation.Role roleAnnotation = field.getAnnotation(annotation.Role.class);
-            String roleName = roleAnnotation.name();  
-            HttpSession session = request.getSession();  
-            if (roleName != null && !roleName.isBlank()) {
-                field.setAccessible(true);
-                field.set(object,roleName);
-                String existingRoles = (String) session.getAttribute("role");
-                if (existingRoles == null || existingRoles.isBlank()) {
+    /**
+     * Vérifie que la session possède le(s) rôle(s) exigé(s) par @Role.
+     * Ne modifie JAMAIS la session : les rôles doivent être établis au login.
+     */
+    public void validateRole(Object object, Field field) throws Exception {
+        if (!field.isAnnotationPresent(annotation.Role.class)) {
+            return;
+        }
 
-                    session.setAttribute("role", roleName);
-                } else {
+        annotation.Role roleAnnotation = field.getAnnotation(annotation.Role.class);
+        String requiredRoles = roleAnnotation.name();
 
-                    List<String> roleList = new ArrayList<>(Arrays.asList(existingRoles.split(",")));
-                    if (!roleList.contains(roleName)) {
-                        roleList.add(roleName);
-                        session.setAttribute("role", String.join(",", roleList));
-                    }
+        HttpSession session = request.getSession(false);
+        if (session == null || !Boolean.TRUE.equals(session.getAttribute("authenticated"))) {
+            throw new Exception("Accès interdit : l'utilisateur n'est pas authentifié.");
+        }
+
+        String rolesInSession = (String) session.getAttribute("role");
+        if (rolesInSession == null || rolesInSession.isBlank()) {
+            throw new Exception("Accès interdit : aucun rôle défini dans la session.");
+        }
+
+        List<String> userRoles = new ArrayList<>();
+        for (String r : rolesInSession.split(",")) {
+            String trimmed = r.trim();
+            if (!trimmed.isEmpty()) {
+                userRoles.add(trimmed);
+            }
+        }
+
+        String matched = null;
+        if (requiredRoles == null || requiredRoles.isBlank()) {
+            // Pas de rôle exigé : on prend le premier rôle de la session
+            if (!userRoles.isEmpty()) {
+                matched = userRoles.get(0);
+            }
+        } else {
+            for (String required : requiredRoles.split(",")) {
+                String r = required.trim();
+                if (!r.isEmpty() && userRoles.contains(r)) {
+                    matched = r;
+                    break;
                 }
             }
-
-
-            session.setAttribute("authenticated", true);
         }
+
+        if (matched == null) {
+            throw new Exception("Accès interdit : rôle insuffisant (requis : " + requiredRoles
+                    + ", session : " + rolesInSession + ").");
+        }
+
+        field.setAccessible(true);
+        field.set(object, matched);
     }
 
     private void addError(String objectName, String fieldName, String message, String value) {
