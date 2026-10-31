@@ -11,6 +11,18 @@ Il scanne les classes annotées `@Controller`, mappe les URLs vers les méthodes
 - Vues : `ModelView` / `ModelAndView` (`setUrl()` + `addObjet()`)
 - API REST : `@RestApi` (JSON maison via `util.JsonUtil`)
 - Base générique : `util.DBUtil` + `dao.BaseDAO` (JDBC, `@Table`/`@Column`/`@Id`)
+- Contrôleurs **singleton** par défaut (`controllers.singleton=false` pour revenir au prototype)
+
+## Authentification
+- `@Authentification(name = "ADMIN,MANAGER")` sur une méthode : exige `authenticated=true` + un rôle autorisé en session.
+- `@Role(name = "ADMIN")` sur un **champ** : *vérifie* le rôle de la session et lie le champ. Ne modifie jamais la session.
+- Le login doit établir la session lui-même :
+  ```java
+  session.add("user", username);
+  session.add("role", role);
+  session.add("authenticated", true);
+  ```
+- `CustomSession.add()` écrase la valeur (comportement `HttpSession.setAttribute`), donc un re-login change bien le rôle.
 
 ## Prérequis
 - JDK (avec `javac`, `jar` dans le PATH)

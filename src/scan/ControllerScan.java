@@ -1,7 +1,9 @@
 package scan;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.net.URL;
 import java.util.Enumeration;
 import java.util.List;
@@ -12,6 +14,7 @@ import annotation.Post;
 import annotation.Url;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.http.HttpServletRequest;
+import util.CustomSession;
 import util.Mapping;
 import util.ModelAndView;
 import util.VerbAction;
@@ -21,16 +24,20 @@ public class ControllerScan {
 
     private final Map<String, Mapping> urlMappings;
     private final List<String> controllerList;
-    
+    private final Map<String, Object> controllerInstances;
+
     private final ServletContext context;
     private final HttpServletRequest request;
     private final String packageName;
+    private final boolean singletonEnabled;
 
     // Constructeur pour initialiser les attributs
     public ControllerScan(Map<String, Mapping> urlMappings, List<String> controllerList,
+                          Map<String, Object> controllerInstances,
                           ServletContext context, HttpServletRequest request) throws Exception {
         this.urlMappings = urlMappings;
         this.controllerList = controllerList;
+        this.controllerInstances = controllerInstances;
         this.context = context;
         this.request = request;
 
@@ -40,6 +47,11 @@ public class ControllerScan {
         if (this.packageName == null) {
             throw new Exception("Aucune package-to-scan trouvé dans le context.");
         }
+
+        // Mode singleton des contrôleurs (défaut : true).
+        // controllers.singleton = false dans web.xml pour revenir au prototype.
+        String flag = context.getInitParameter("controllers.singleton");
+        this.singletonEnabled = flag == null || Boolean.parseBoolean(flag);
     }
 
     // Méthode principale pour initialiser les contrôleurs
@@ -91,6 +103,7 @@ public class ControllerScan {
                     Class<?> clazz = Class.forName(className);
                     if (clazz.isAnnotationPresent(Controller.class)) {
                         controllerList.add(className);
+                        registerInstance(clazz, className);
                         Method[] methods = clazz.getDeclaredMethods();
                         for (Method method : methods) {
                             if (method.isAnnotationPresent(Url.class)) {
@@ -103,6 +116,40 @@ public class ControllerScan {
                 }
             }
         }
+    }
+
+    /**
+     * Crée et mémorise l'instance unique du contrôleur (mode singleton).
+     * Les contrôleurs ayant un champ CustomSession (état lié à la requête)
+     * restent instanciés par requête pour éviter les fuites entre utilisateurs.
+     */
+    private void registerInstance(Class<?> clazz, String className) {
+        if (!singletonEnabled) {
+            return;
+        }
+        if (hasRequestScopedField(clazz)) {
+            System.out.println("[gogo] " + className
+                    + " garde une instance par requête (champ CustomSession détecté).");
+            return;
+        }
+        try {
+            Object instance = clazz.getDeclaredConstructor().newInstance();
+            controllerInstances.put(className, instance);
+        } catch (Exception e) {
+            System.out.println("[gogo] Singleton impossible pour " + className + " : " + e.getMessage());
+        }
+    }
+
+    private boolean hasRequestScopedField(Class<?> clazz) {
+        for (Field f : clazz.getDeclaredFields()) {
+            if (Modifier.isStatic(f.getModifiers())) {
+                continue;
+            }
+            if (f.getType() == CustomSession.class) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // Méthode pour valider et enregistrer la méthode dans les mappings

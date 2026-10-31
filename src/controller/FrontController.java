@@ -30,7 +30,7 @@ import java.util.HashMap;
 public class FrontController extends HttpServlet {
     private List<String> controllerList = new ArrayList<>();
     private Map<String, Mapping> urlMappings = new HashMap<>();
-    private Map<String, String> handleError = new HashMap<>();
+    private Map<String, Object> controllerInstances = new HashMap<>();
     private boolean initialized = false;
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
@@ -39,8 +39,8 @@ public class FrontController extends HttpServlet {
         synchronized (this) {
             if (!initialized) {
                 try {
-                    ControllerScan controllerScan = new ControllerScan(urlMappings, controllerList, getServletContext(),
-                            request);
+                    ControllerScan controllerScan = new ControllerScan(urlMappings, controllerList,
+                            controllerInstances, getServletContext(), request);
                     controllerScan.initControllers();
                     try {
                         util.DBUtil.init(getServletContext());
@@ -93,7 +93,8 @@ public class FrontController extends HttpServlet {
                 sb.append("<li>" + controller + "</li>");
             }
             sb.append("</ul>");
-            handleError.clear();
+            // Map locale à la requête : évite tout partage d'erreurs entre utilisateurs
+            Map<String, String> handleError = new HashMap<>();
             String mappedURL = requestURL.replace(baseUrl, "");
             if (!mappedURL.startsWith("/")) {
                 mappedURL = "/" + mappedURL;
@@ -131,12 +132,19 @@ public class FrontController extends HttpServlet {
                     }
 
                     try {
-                        Object controllerInstance = clazz.getDeclaredConstructor().newInstance();
-                        Field[] fields = clazz.getDeclaredFields();
-                        for (Field field : fields) {
-                            if (field.getType() == CustomSession.class) {
-                                field.setAccessible(true);
-                                field.set(controllerInstance, new CustomSession());
+                        Object controllerInstance = controllerInstances.get(map.getControlleur());
+                        boolean sharedInstance = controllerInstance != null;
+                        if (controllerInstance == null) {
+                            controllerInstance = clazz.getDeclaredConstructor().newInstance();
+                        }
+                        if (!sharedInstance) {
+                            // Injection de CustomSession uniquement sur une instance par requête
+                            Field[] fields = clazz.getDeclaredFields();
+                            for (Field field : fields) {
+                                if (field.getType() == CustomSession.class) {
+                                    field.setAccessible(true);
+                                    field.set(controllerInstance, new CustomSession());
+                                }
                             }
                         }
 
@@ -165,7 +173,6 @@ public class FrontController extends HttpServlet {
                             }
 
                         }
-                        handleError = new HashMap<>();
 
                         for (Object param : methodParam) {
                             if (param instanceof CustomSession) {

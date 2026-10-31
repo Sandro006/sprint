@@ -9,8 +9,9 @@ public class CustomSession {
     public CustomSession() {
     }
 
+    /** Ajoute ou remplace (comme HttpSession.setAttribute). */
     public void add(String key,Object value) {
-        values.putIfAbsent(key, value);
+        values.put(key, value);
     }
 
     public Object get(String key){
